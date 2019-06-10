@@ -2,79 +2,102 @@
  * Module dependencies.
  */
 
-var express = require('express');
-var routes = require('./routes');
-var img = require('./routes/image');
-var manage = require('./routes/manage');
-var upload = require('./routes/upload');
-var admin = require('./routes/admin');
+var express = require("express");
+var router = express.Router();
+var routes = require("./routes");
+var img = require("./routes/image");
+var manage = require("./routes/manage");
+var upload = require("./routes/upload");
+var admin = require("./routes/admin");
 
-var http = require('http');
-var path = require('path');
+var http = require("http");
+var path = require("path");
 var config = require("./config");
+var favicon = require("serve-favicon");
+var logger = require("morgan");
+var methodOverride = require("method-override");
+var session = require("express-session");
+var bodyParser = require("body-parser");
+var multer = require("multer");
+var errorHandler = require("errorhandler");
+var morgan = require("morgan");
 
-var fs = require('fs');
-var errorLog = fs.createWriteStream(config.errorlog, {flags: 'a'});
+var fs = require("fs");
+var errorLog = fs.createWriteStream(config.errorlog, { flags: "a" });
 
-process.on('uncaughtException', function (err) {
-    console.trace(err);
-    errorLog.write('\n[' + new Date + ']' + 'Caught exception: ' + err);
+process.on("uncaughtException", function(err) {
+  console.trace(err);
+  errorLog.write("\n[" + new Date() + "]" + "Caught exception: " + err);
 });
 
-var start = function () {
-    var app = express();
+var start = function() {
+  var app = express();
 
-    app.set('views', __dirname + '/views');
-    app.set('view engine', 'jade');
-    app.use(express.bodyParser({
-        uploadDir: config.tmproot
-    }));
-    app.use(express.favicon());
-    app.use(express.logger('dev'));
-    app.use(express.bodyParser());
-    app.use(express.methodOverride());
-    app.use(app.router);
-    app.use(express.static(path.join(__dirname, 'public')));
+  app.set("views", __dirname + "/views");
+  app.set("view engine", "jade");
 
+  app.use(router);
+  app.use(favicon(path.join(__dirname, "/public/favicon.ico")));
+  app.use(logger("dev"));
+  app.use(methodOverride());
+  app.use(session({ resave: true, saveUninitialized: true, secret: "uwotm8" }));
 
-    // development only
-    if ('development' == app.get('env')) {
-        app.use(express.errorHandler());
-    }
+  app.use(bodyParser.json());
+  app.use(bodyParser.urlencoded({ extended: true }));
+  //   app.use(bodyParser.uploadDir);
+  //   app.use(
+  //     multer({
+  //       dest: config.tmproot
+  //     })
+  //   );
 
-    //index
-    app.get('/', routes.index);
+  app.use(express.static(path.join(__dirname, "public")));
 
-    //copy
-    app.get('/copy', routes.copy);
+  // development only
+  if ("development" == app.get("env")) {
+    app.use(errorHandler());
+  }
 
-    //get img
-    app.get(/^\/\d{1,9}\/[0-9a-f]{32}(?:-\d+-\d+)?(-f|-s)?\.(jpg|jpeg|gif|png)$/, img.read);
+  //index
+  router.get("/", routes.index);
 
+  //copy
+  router.get("/copy", routes.copy);
 
-    //img manage
-    app.get(/^\/\d{1,9}\/[0-9a-f]{32}(?:-\d+-\d+)?(-f|-s)?\.(jpg|jpeg|gif|png)\/manage-(tleft|tright|del|resize|info)$/, manage.exec);
+  //get img
+  router.get(
+    /^\/\d{1,9}\/[0-9a-f]{32}(?:-\d+-\d+)?(-f|-s)?\.(jpg|jpeg|gif|png)$/,
+    img.read
+  );
 
+  //img manage
+  router.get(
+    /^\/\d{1,9}\/[0-9a-f]{32}(?:-\d+-\d+)?(-f|-s)?\.(jpg|jpeg|gif|png)\/manage-(tleft|tright|del|resize|info)$/,
+    manage.exec
+  );
 
-    //img upload
-    app.post(/^\/\d{1,9}\/upload$/, upload.exec);
+  //img upload
+  router.post(
+    /^\/\d{1,9}\/upload$/,
+    multer({
+      dest: config.tmproot
+    }).any(),
+    upload.exec
+  );
 
-    //admin
-    app.post('/admin', admin.exec);
+  //admin
+  router.post("/admin", admin.exec);
 
-	//nginx monitor
-	app.get('/_jiankong.jsp', function (req, res) {
-		res.send(200, 'ok');
-		res.end();
-	});
+  //nginx monitor
+  router.get("/_jiankong.jsp", function(req, res) {
+    res.send(200, "ok");
+    res.end();
+  });
 
-
-
-    http.createServer(app).listen(config.port, function () {
-        console.log('%s:%s',new Date(),'server listening:' + config.port);
-    });
-}
-
+  http.createServer(app).listen(config.port, function() {
+    console.log("%s:%s", new Date(), "server listening:" + config.port);
+  });
+};
 
 start();
 
